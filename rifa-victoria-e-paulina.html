@@ -68,6 +68,13 @@
   .toast{position:fixed; left:50%; bottom:22px; transform:translateX(-50%) translateY(80px); background:var(--ink); color:#fff; padding:11px 18px; border-radius:999px; font-size:14px; font-weight:600; transition:transform .25s; z-index:50; max-width:92vw; text-align:center}
   .toast.show{transform:translateX(-50%) translateY(0)}
   .empty{color:var(--muted); text-align:center; padding:16px 0}
+  .sorteio-palco{text-align:center; padding:10px 0 4px}
+  .sorteio-num{font-size:92px; font-weight:900; line-height:1; color:var(--brand); text-shadow:0 4px 0 #ffe1d1}
+  .sorteio-num.girando{animation:giro .12s infinite alternate}
+  .sorteio-num.ganhou{animation:pop .5s}
+  .sorteio-nome{font-size:20px; font-weight:800; margin-top:6px; min-height:26px}
+  @keyframes giro{from{transform:scale(1) rotate(-2deg)}to{transform:scale(1.08) rotate(2deg)}}
+  @keyframes pop{0%{transform:scale(.6)}60%{transform:scale(1.15)}100%{transform:scale(1)}}
   a.wpp{color:var(--green); font-weight:700; text-decoration:none}
   ul.itens{list-style:none; margin:0; padding:0}
   ul.itens li{padding:7px 2px; border-bottom:1px solid var(--line); font-size:15px}
@@ -143,6 +150,24 @@
     </div>
     <p class="muted" id="adminHint"><b>Modo organizador (só do vendedor):</b> depois de conferir o Pix, selecione os números do comprador e use “Marcar como pago”. Também serve pra liberar um número vendido.</p>
     <div id="listaWrap"><p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p></div>
+  </section>
+
+  <section class="card">
+    <h2>🎲 Sorteador — dia do sorteio</h2>
+    <p class="muted">O sorteio é feito <b>somente entre os números PAGOS</b> (quem pagou de verdade). Toque em SORTEAR e o número gira na tela até sair o ganhador. 🏆</p>
+    <div class="sorteio-palco">
+      <div class="sorteio-num" id="sorteioNum">?</div>
+      <div class="sorteio-nome" id="sorteioNome">Pronto pra sortear 🍀</div>
+      <p class="muted" id="sorteioInfo" style="margin:6px 0 0">0 número(s) pago(s) participando</p>
+    </div>
+    <div class="row">
+      <button class="btn primary" id="btnSortear" style="font-size:17px; padding:13px">🎲 SORTEAR AGORA</button>
+    </div>
+    <div class="row">
+      <button class="btn ghost" id="btnAnunciar" style="display:none">📲 Anunciar ganhador no WhatsApp</button>
+      <button class="btn ghost" id="btnLimparSorteio" style="display:none">🗑️ Limpar resultado</button>
+    </div>
+    <div id="sorteioHistorico"></div>
   </section>
 
   <section class="card">
@@ -248,8 +273,9 @@ function faixaDoLink(){
 const FAIXA_LINK = faixaDoLink();
 let filtroFaixa = FAIXA_LINK; // -1 = todas
 let admin = false;
+let sorteio = {historico: []};
 
-function salvar(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros})); }
+function salvar(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros, sorteio})); }
 function normalizarPagos(obj){
   let mudou = false;
   Object.values(obj || {}).forEach(r=>{ if(r && r.status !== 'pago'){ r.status = 'pago'; mudou = true; } });
@@ -265,6 +291,7 @@ function carregar(){
     if(!cfg.organizador) cfg.organizador = 'Fagner';
     if(!cfg.whats) cfg.whats = '44997096769';
     if(d.numeros){ numeros = d.numeros; if(normalizarPagos(numeros)) salvar(); }
+    if(d.sorteio && Array.isArray(d.sorteio.historico)) sorteio = d.sorteio;
   }catch(e){}
 }
 function fmt(v){ return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -415,6 +442,7 @@ function render(){
     });
     wrap.innerHTML = html + '</table>';
   }
+  renderSorteio();
 }
 
 function acaoAdmin(n){
@@ -467,7 +495,7 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   const d = (cfg.whats || '').replace(/\D/g,'');
   if(!d){ toast('WhatsApp do organizador não cadastrado'); return; }
   const faixaTxt = FAIXA_LINK>=0 ? ('Faixa ' + rotuloFaixa(FAIXA_LINK) + ' — ' + cfg.vendedores[FAIXA_LINK] + '\n') : '';
-  const msg = 'Oi, ' + (cfg.organizador || 'organizador') + '! Quero comprar número(s) da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖\n' +
+  const msg = 'Oi! Quero comprar número(s) da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖\n' +
     faixaTxt +
     '🎟️ Número(s): ' + lista.join(', ') + '\n' +
     '💰 Total: ' + fmt(qtd*PRECO) + '\n' +
@@ -496,7 +524,7 @@ document.getElementById('btnCopiarPix').onclick = async ()=>{
 document.getElementById('btnWhatsOrg').onclick = ()=>{
   const d = (cfg.whats||'').replace(/\D/g,'');
   if(!d){ toast('WhatsApp do organizador não cadastrado'); return; }
-  const msg = 'Oi, ' + (cfg.organizador || 'organizador') + '! Quero um número da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖';
+  const msg = 'Oi! Quero um número da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖';
   window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
 };
 document.getElementById('btnCompartilhar').onclick = ()=>{
@@ -539,7 +567,7 @@ document.getElementById('btnSalvarCfg').onclick = ()=>{
 };
 
 document.getElementById('btnExportar').onclick = ()=>{
-  const blob = new Blob([JSON.stringify({cfg, numeros}, null, 2)], {type:'application/json'});
+  const blob = new Blob([JSON.stringify({cfg, numeros, sorteio}, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
   a.href = URL.createObjectURL(blob); a.download = 'rifa-kit-churrasco-backup.json'; a.click();
   URL.revokeObjectURL(a.href);
@@ -554,11 +582,110 @@ document.getElementById('fileImport').addEventListener('change', e=>{
       if(d.cfg) cfg = Object.assign(cfg, d.cfg);
       if(!Array.isArray(cfg.vendedores) || cfg.vendedores.length!==4) cfg.vendedores = ['Jô','Higor','Victoria e Paulina','Sirley'];
       numeros = d.numeros || {}; normalizarPagos(numeros);
+      if(d.sorteio && Array.isArray(d.sorteio.historico)) sorteio = d.sorteio;
       selecionados.clear(); salvar(); preencherCfg(); render(); toast('Cópia restaurada! ✔');
     }catch(err){ toast('Arquivo inválido 😕'); }
   };
   rd.readAsText(f);
 });
+
+// ===== SORTEADOR (só entre números PAGOS) =====
+let sorteando = false;
+function participantesSorteio(){
+  return Object.entries(numeros)
+    .filter(([n,r])=> r && r.status==='pago' && (FAIXA_LINK===-1 || faixaDe(+n)===FAIXA_LINK))
+    .map(([n,r])=>({n:+n, nome:r.nome||'', whats:r.whats||''}))
+    .sort((a,b)=>a.n-b.n);
+}
+function sorteioAleatorio(max){
+  try{ const a = new Uint32Array(1); crypto.getRandomValues(a); return a[0] % max; }
+  catch(e){ return Math.floor(Math.random()*max); }
+}
+function renderSorteio(){
+  const info = document.getElementById('sorteioInfo'); if(!info) return;
+  const parts = participantesSorteio();
+  info.textContent = parts.length + ' número(s) PAGO(S) participando do sorteio' +
+    (FAIXA_LINK===-1 ? ' (todas as faixas)' : ' (só desta faixa — pro sorteio oficial do prêmio, use a página GERAL)');
+  const hist = document.getElementById('sorteioHistorico');
+  const btnA = document.getElementById('btnAnunciar');
+  const btnL = document.getElementById('btnLimparSorteio');
+  const numEl = document.getElementById('sorteioNum');
+  const nomeEl = document.getElementById('sorteioNome');
+  if(sorteio.historico && sorteio.historico.length){
+    if(btnA) btnA.style.display = '';
+    if(btnL) btnL.style.display = '';
+    hist.innerHTML = '<h3>🏆 Resultado(s) do sorteio</h3>' + sorteio.historico.map(h =>
+      '<p style="margin:6px 0"><b>Nº ' + h.n + '</b> — ' + esc(h.nome) +
+      ' <span class="muted">(vendido por ' + esc(h.vendedor) + ' · ' + esc(h.quando) + ')</span></p>').join('');
+    if(!sorteando && numEl && nomeEl){
+      const u = sorteio.historico[0];
+      numEl.textContent = u.n;
+      nomeEl.innerHTML = '🏆 ' + esc(u.nome);
+    }
+  } else {
+    if(btnA) btnA.style.display = 'none';
+    if(btnL) btnL.style.display = 'none';
+    hist.innerHTML = '';
+    if(!sorteando && numEl && nomeEl){
+      numEl.textContent = '?';
+      numEl.classList.remove('ganhou');
+      nomeEl.textContent = 'Pronto pra sortear 🍀';
+    }
+  }
+}
+function sortear(){
+  if(sorteando) return;
+  const parts = participantesSorteio();
+  if(!parts.length){ toast('Ainda não há números PAGOS pra sortear 😕'); return; }
+  sorteando = true;
+  const btn = document.getElementById('btnSortear');
+  const numEl = document.getElementById('sorteioNum');
+  const nomeEl = document.getElementById('sorteioNome');
+  btn.disabled = true; btn.textContent = '🎲 Sorteando...';
+  numEl.classList.remove('ganhou'); numEl.classList.add('girando');
+  nomeEl.textContent = 'Girando... 🍀';
+  const inicio = Date.now(); const duracao = 3200;
+  function finalizar(){
+    const lista = participantesSorteio();
+    const g = lista[sorteioAleatorio(lista.length)];
+    numEl.classList.remove('girando'); numEl.classList.add('ganhou');
+    numEl.textContent = g.n;
+    nomeEl.innerHTML = '🏆 ' + esc(g.nome) + ' — vendido por ' + esc(cfg.vendedores[faixaDe(g.n)]);
+    sorteio.historico.unshift({n:g.n, nome:g.nome, whats:g.whats,
+      vendedor: cfg.vendedores[faixaDe(g.n)], quando: new Date().toLocaleString('pt-BR')});
+    salvar();
+    sorteando = false;
+    btn.disabled = false; btn.textContent = '🎲 SORTEAR DE NOVO';
+    renderSorteio();
+    toast('🎉 Temos um ganhador: número ' + g.n + '!');
+  }
+  function passo(){
+    const lista = participantesSorteio();
+    if(!lista.length){ sorteando = false; btn.disabled = false; btn.textContent = '🎲 SORTEAR AGORA'; numEl.classList.remove('girando'); return; }
+    const atual = lista[sorteioAleatorio(lista.length)];
+    numEl.textContent = atual.n;
+    const t = Date.now() - inicio;
+    if(t < duracao){ setTimeout(passo, 60 + Math.pow(t/duracao, 2) * 280); }
+    else finalizar();
+  }
+  passo();
+}
+document.getElementById('btnSortear').onclick = sortear;
+document.getElementById('btnAnunciar').onclick = ()=>{
+  const u = (sorteio.historico || [])[0]; if(!u) return;
+  const txt = '🎉🏆 *TEMOS UM GANHADOR!* 🏆🎉\n\n' +
+    '🍖 *' + (cfg.titulo || 'Rifa — Kit Churrasco') + '*\n' +
+    '🎟️ Número sorteado: *' + u.n + '*\n' +
+    '🙋 Ganhador(a): *' + u.nome + '*\n' +
+    '📒 Número vendido por: ' + u.vendedor + '\n\n' +
+    'Parabéns! 🎊 Obrigado a todos que participaram! 🍀';
+  window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
+};
+document.getElementById('btnLimparSorteio').onclick = ()=>{
+  if(confirm('Limpar o resultado do sorteio? Use só se for sortear de novo do zero.')){
+    sorteio = {historico: []}; salvar(); renderSorteio(); toast('Resultado do sorteio limpo');
+  }
+};
 
 carregar();
 preencherCfg();
