@@ -127,9 +127,9 @@
     <div id="faixas"></div>
     <div class="selbar" id="selbar">
       <div><b id="selTxt">0 número(s)</b><div style="font-size:13px; opacity:.85" id="selTotal">Total: R$ 0,00</div></div>
-      <button class="btn primary" id="btnReservar">Enviar pedido ➜</button>
+      <button class="btn primary" id="btnReservar">💸 Pagar com Pix ➜</button>
     </div>
-    <p class="muted">Toque nos números verdes pra selecionar e enviar o pedido. A compra só é confirmada depois que o vendedor conferir o Pix e marcar como PAGO. 👇</p>
+    <p class="muted">Toque nos números verdes pra escolher e depois em PAGAR COM PIX: a chave aparece pra copiar, você paga no seu banco e envia o comprovante. Quem confirma e marca PAGO é o vendedor. 👇</p>
   </section>
 
   <section class="card">
@@ -138,9 +138,9 @@
     <div class="row">
       <button class="btn green" id="btnCopiarPix">📋 Copiar chave Pix</button>
       <button class="btn ghost" id="btnCompartilhar">📲 Compartilhar a rifa</button>
-      <button class="btn ghost" id="btnWhatsOrg" style="display:none">💬 Falar com o organizador</button>
+      <button class="btn ghost" id="btnWhatsOrg" style="display:none">📎 Enviar comprovante</button>
     </div>
-    <p class="muted">Pagou? Envie o comprovante pelo WhatsApp. Quem confirma o pagamento é o vendedor, depois de conferir o Pix. ✔️</p>
+    <p class="muted">Escolha seus números lá em cima e toque em PAGAR COM PIX — a chave aparece na hora pra você copiar. Depois de pagar, envie o comprovante pelo WhatsApp. Quem confirma e marca PAGO é o vendedor. ✔️</p>
   </section>
 
   <section class="card">
@@ -209,15 +209,20 @@
 
 <dialog id="dlgReserva">
   <form method="dialog" class="dlg" id="formReserva">
-    <h3 id="dlgTitulo">Enviar pedido</h3>
+    <h3 id="dlgTitulo">💸 Pagar com Pix</h3>
     <p class="muted" id="dlgNums" style="margin:0"></p>
+    <div id="dlgPixBox" style="display:none">
+      <div class="pixbox" id="dlgPix" style="margin-top:12px"></div>
+      <div class="row"><button type="button" class="btn green" id="btnCopiarPixDlg">📋 Copiar chave Pix</button></div>
+      <p class="muted" style="margin:10px 0 0"><b>Como pagar:</b> 1️⃣ Copie a chave e pague no app do seu banco. 2️⃣ Volte aqui e preencha seu nome e WhatsApp. 3️⃣ Toque em ENVIAR COMPROVANTE e <b>anexe a foto do comprovante</b> na conversa do WhatsApp.</p>
+    </div>
     <label id="lblNome">Seu nome</label>
     <input id="inpNome" type="text" required placeholder="Nome completo" autocomplete="name">
     <label id="lblWhats">Seu WhatsApp</label>
     <input id="inpWhats" type="tel" required placeholder="Ex.: 11 99999-9999" autocomplete="tel">
     <div class="row">
       <button class="btn ghost" value="cancel" formnovalidate>Cancelar</button>
-      <button class="btn primary" id="btnConfirmarReserva" value="ok">📲 Enviar pedido no WhatsApp</button>
+      <button class="btn primary" id="btnConfirmarReserva" value="ok">📲 Já paguei — enviar comprovante</button>
     </div>
     <p class="muted"><span id="dlgTexto">O pedido abre no WhatsApp do organizador. Seus números só ficam PAGOS depois que o vendedor conferir o Pix.</span> Total: <b id="dlgValor"></b></p>
   </form>
@@ -414,7 +419,7 @@ function render(){
   // Barra de seleção
   const sb = document.getElementById('selbar');
   const btnSel = document.getElementById('btnReservar');
-  if(btnSel) btnSel.textContent = admin ? 'Marcar como pago ➜' : 'Enviar pedido ➜';
+  if(btnSel) btnSel.textContent = admin ? 'Marcar como pago ➜' : '💸 Pagar com Pix ➜';
   if(selecionados.size){
     sb.classList.add('show');
     const lista = [...selecionados].sort((a,b)=>a-b);
@@ -466,14 +471,19 @@ document.getElementById('filtros').addEventListener('click', e=>{
 const dlg = document.getElementById('dlgReserva');
 document.getElementById('btnReservar').onclick = ()=>{
   const lista = [...selecionados].sort((a,b)=>a-b);
-  document.getElementById('dlgTitulo').textContent = admin ? 'Registrar como PAGO' : 'Enviar pedido';
+  document.getElementById('dlgTitulo').textContent = admin ? 'Registrar como PAGO' : '💸 Pagar com Pix';
   document.getElementById('lblNome').textContent = admin ? 'Nome do comprador' : 'Seu nome';
   document.getElementById('lblWhats').textContent = admin ? 'WhatsApp do comprador' : 'Seu WhatsApp';
-  document.getElementById('btnConfirmarReserva').textContent = admin ? '✔ Confirmar pagamento recebido' : '📲 Enviar pedido no WhatsApp';
+  document.getElementById('btnConfirmarReserva').textContent = admin ? '✔ Confirmar pagamento recebido' : '📲 Já paguei — enviar comprovante';
   document.getElementById('dlgTexto').textContent = admin
     ? 'Use somente depois de conferir o Pix no banco. Ao confirmar, os números são marcados como PAGOS com os dados do comprador.'
-    : 'O pedido abre no WhatsApp do organizador. Seus números só ficam PAGOS depois que o vendedor conferir o Pix.';
+    : 'Seus números só ficam PAGOS depois que o vendedor conferir o Pix. Não esquece de anexar a foto do comprovante na conversa do WhatsApp.';
   document.getElementById('dlgNums').textContent = 'Número(s): ' + lista.join(', ');
+  const dpb = document.getElementById('dlgPixBox');
+  if(dpb) dpb.style.display = admin ? 'none' : '';
+  const dpx = document.getElementById('dlgPix');
+  if(dpx) dpx.textContent = cfg.pix ? '🔑 ' + cfg.pix : '⚠️ Chave Pix ainda não cadastrada';
+
   document.getElementById('dlgValor').textContent = fmt(lista.length*PRECO);
   dlg.showModal();
 };
@@ -495,17 +505,17 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   const d = (cfg.whats || '').replace(/\D/g,'');
   if(!d){ toast('WhatsApp do organizador não cadastrado'); return; }
   const faixaTxt = FAIXA_LINK>=0 ? ('Faixa ' + rotuloFaixa(FAIXA_LINK) + ' — ' + cfg.vendedores[FAIXA_LINK] + '\n') : '';
-  const msg = 'Oi! Quero comprar número(s) da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖\n' +
+  const msg = 'Oi! Fiz o Pix da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖\n' +
     faixaTxt +
     '🎟️ Número(s): ' + lista.join(', ') + '\n' +
     '💰 Total: ' + fmt(qtd*PRECO) + '\n' +
     '🙋 Nome: ' + nome + '\n' +
     '📱 Meu WhatsApp: ' + whats + '\n' +
-    'Vou fazer o Pix e enviar o comprovante. Pode marcar como PAGO quando conferir, por favor?';
+    'Segue o comprovante aqui na conversa. Pode marcar como PAGO quando conferir, por favor?';
   selecionados.clear(); render(); dlg.close();
   document.getElementById('formReserva').reset();
   window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
-  toast('Abrindo o WhatsApp com seu pedido 📲');
+  toast('Abrindo o WhatsApp — anexe o comprovante 📎');
 });
 
 document.getElementById('modoAdmin').addEventListener('change', e=>{
@@ -521,10 +531,15 @@ document.getElementById('btnCopiarPix').onclick = async ()=>{
   try{ await navigator.clipboard.writeText(cfg.pix); toast('Chave Pix copiada! 📋'); }
   catch(e){ toast('Chave Pix: ' + cfg.pix); }
 };
+document.getElementById('btnCopiarPixDlg').onclick = async ()=>{
+  if(!cfg.pix){ toast('Chave Pix ainda não cadastrada'); return; }
+  try{ await navigator.clipboard.writeText(cfg.pix); toast('Chave Pix copiada! 📋'); }
+  catch(e){ toast('Chave Pix: ' + cfg.pix); }
+};
 document.getElementById('btnWhatsOrg').onclick = ()=>{
   const d = (cfg.whats||'').replace(/\D/g,'');
   if(!d){ toast('WhatsApp do organizador não cadastrado'); return; }
-  const msg = 'Oi! Quero um número da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖';
+  const msg = 'Oi! Fiz o Pix da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖 Segue o comprovante aqui na conversa.';
   window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
 };
 document.getElementById('btnCompartilhar').onclick = ()=>{
