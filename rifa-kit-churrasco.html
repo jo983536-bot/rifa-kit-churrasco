@@ -220,12 +220,12 @@
     <div id="dlgPixBox" style="display:none">
       <div class="pixbox" id="dlgPix" style="margin-top:12px"></div>
       <div class="row"><button type="button" class="btn green" id="btnCopiarPixDlg">📋 Copiar chave Pix</button></div>
-      <p class="muted" style="margin:10px 0 0"><b>Como pagar:</b> 1️⃣ Copie a chave e pague no app do seu banco. 2️⃣ Volte aqui e preencha seu nome e WhatsApp. 3️⃣ Toque em ENVIAR COMPROVANTE e <b>anexe a foto do comprovante</b> na conversa do WhatsApp.</p>
+      <p class="muted" style="margin:10px 0 0"><b>Como pagar:</b> 1️⃣ Copie a chave e pague no app do seu banco. 2️⃣ Volte aqui e preencha seu nome (o WhatsApp é opcional). 3️⃣ Toque em ENVIAR COMPROVANTE e <b>anexe a foto do comprovante</b> na conversa do WhatsApp.</p>
     </div>
     <label id="lblNome">Seu nome</label>
     <input id="inpNome" type="text" required placeholder="Nome completo" autocomplete="name">
-    <label id="lblWhats">Seu WhatsApp</label>
-    <input id="inpWhats" type="tel" required placeholder="Ex.: 11 99999-9999" autocomplete="tel">
+    <label id="lblWhats">Seu WhatsApp (opcional)</label>
+    <input id="inpWhats" type="tel" placeholder="Ex.: 11 99999-9999 (se quiser)" autocomplete="tel">
     <div class="row">
       <button class="btn ghost" value="cancel" formnovalidate>Cancelar</button>
       <button class="btn primary" id="btnConfirmarReserva" value="ok">📲 Já paguei — enviar comprovante</button>
@@ -589,7 +589,7 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   e.preventDefault();
   const nome = document.getElementById('inpNome').value.trim();
   const whats = document.getElementById('inpWhats').value.trim();
-  if(!nome || !whats){ toast('Preenche nome e WhatsApp 😉'); return; }
+  if(!nome){ toast('Preenche seu nome 😉'); return; }
   const lista = [...selecionados].sort((a,b)=>a-b);
   const qtd = lista.length;
   if(admin){
@@ -607,7 +607,7 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
     '🎟️ Número(s): ' + lista.join(', ') + '\n' +
     '💰 Total: ' + fmt(qtd*PRECO) + '\n' +
     '🙋 Nome: ' + nome + '\n' +
-    '📱 Meu WhatsApp: ' + whats + '\n' +
+    (whats ? ('📱 Meu WhatsApp: ' + whats + '\n') : '') +
     'Segue o comprovante aqui na conversa. Pode marcar como PAGO quando conferir, por favor?';
   lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pendente', quando: Date.now()}; });
   selecionados.clear(); salvar(); render(); dlg.close();
