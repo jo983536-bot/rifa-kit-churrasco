@@ -41,7 +41,6 @@
   @media(min-width:560px){ .grid{grid-template-columns:repeat(10,1fr)} }
   .num{aspect-ratio:1; border-radius:10px; border:2px solid var(--green); background:#eafaf0; color:#146c39;
        font-weight:800; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0}
-  .num.reservado{background:#fff3cf; border-color:var(--yellow); color:#8a6100}
   .num.pago{background:#fde3e3; border-color:var(--red); color:#a11; cursor:default}
   .num.sel{background:var(--brand); border-color:var(--brand); color:#fff; transform:scale(1.06)}
   .num:disabled{cursor:default}
@@ -51,7 +50,6 @@
   th,td{padding:8px 6px; border-bottom:1px solid var(--line); text-align:left; vertical-align:top}
   th{color:var(--muted); font-size:12px; text-transform:uppercase}
   .tag{font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; white-space:nowrap}
-  .tag.reservado{background:#fff3cf; color:#8a6100}
   .tag.pago{background:#fde3e3; color:#a11}
   .mini{font-size:12px; padding:5px 9px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-weight:700}
   dialog{border:none; border-radius:18px; padding:0; width:min(94vw,430px); box-shadow:0 20px 50px rgba(0,0,0,.3)}
@@ -97,7 +95,7 @@
     <div class="stats">
       <div class="stat"><b id="stTotal">200</b><span>números</span></div>
       <div class="stat"><b id="stPagos">0</b><span>pagos</span></div>
-      <div class="stat"><b id="stReservados">0</b><span>reservados</span></div>
+      <div class="stat"><b id="stDisponiveis">200</b><span>disponíveis</span></div>
       <div class="stat"><b id="stArrecadado">R$ 0</b><span>arrecadado</span></div>
     </div>
     <div class="bar"><i id="barra"></i></div>
@@ -111,22 +109,20 @@
     <h2>Escolha seus números 🎟️</h2>
     <div class="legend">
       <span><i class="dot" style="background:#eafaf0;border:2px solid var(--green)"></i>Disponível</span>
-      <span><i class="dot" style="background:#fff3cf;border:2px solid var(--yellow)"></i>Reservado</span>
       <span><i class="dot" style="background:#fde3e3;border:2px solid var(--red)"></i>Pago</span>
     </div>
     <div class="filters" id="filtrosFaixa"></div>
     <div class="filters" id="filtros">
       <button data-f="todos" class="on">Todos</button>
       <button data-f="livre">Disponíveis</button>
-      <button data-f="reservado">Reservados</button>
       <button data-f="pago">Pagos</button>
     </div>
     <div id="faixas"></div>
     <div class="selbar" id="selbar">
       <div><b id="selTxt">0 número(s)</b><div style="font-size:13px; opacity:.85" id="selTotal">Total: R$ 0,00</div></div>
-      <button class="btn primary" id="btnReservar">Reservar ➜</button>
+      <button class="btn primary" id="btnReservar">Enviar pedido ➜</button>
     </div>
-    <p class="muted">Toque nos números verdes pra selecionar. Depois é só reservar com seu nome e WhatsApp e pagar no Pix aqui embaixo. 👇</p>
+    <p class="muted">Toque nos números verdes pra selecionar e enviar o pedido. A compra só é confirmada depois que o vendedor conferir o Pix e marcar como PAGO. 👇</p>
   </section>
 
   <section class="card">
@@ -137,6 +133,7 @@
       <button class="btn ghost" id="btnCompartilhar">📲 Compartilhar a rifa</button>
       <button class="btn ghost" id="btnWhatsOrg" style="display:none">💬 Falar com o organizador</button>
     </div>
+    <p class="muted">Pagou? Envie o comprovante pelo WhatsApp. Quem confirma o pagamento é o vendedor, depois de conferir o Pix. ✔️</p>
   </section>
 
   <section class="card">
@@ -144,8 +141,8 @@
       <h2 style="margin:0">👥 Compradores</h2>
       <label class="switch"><input type="checkbox" id="modoAdmin"> Modo organizador</label>
     </div>
-    <p class="muted" id="adminHint">Ative o <b>Modo organizador</b> pra marcar como pago, liberar número ou excluir uma reserva.</p>
-    <div id="listaWrap"><p class="empty">Nenhum número reservado ainda. Seja o primeiro! 🍀</p></div>
+    <p class="muted" id="adminHint"><b>Modo organizador (só do vendedor):</b> depois de conferir o Pix, selecione os números do comprador e use “Marcar como pago”. Também serve pra liberar um número vendido.</p>
+    <div id="listaWrap"><p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p></div>
   </section>
 
   <section class="card">
@@ -187,17 +184,17 @@
 
 <dialog id="dlgReserva">
   <form method="dialog" class="dlg" id="formReserva">
-    <h3>Reservar número(s)</h3>
+    <h3 id="dlgTitulo">Enviar pedido</h3>
     <p class="muted" id="dlgNums" style="margin:0"></p>
-    <label>Seu nome</label>
+    <label id="lblNome">Seu nome</label>
     <input id="inpNome" type="text" required placeholder="Nome completo" autocomplete="name">
-    <label>Seu WhatsApp</label>
+    <label id="lblWhats">Seu WhatsApp</label>
     <input id="inpWhats" type="tel" required placeholder="Ex.: 11 99999-9999" autocomplete="tel">
     <div class="row">
       <button class="btn ghost" value="cancel" formnovalidate>Cancelar</button>
-      <button class="btn primary" id="btnConfirmarReserva" value="ok">✅ Confirmar reserva</button>
+      <button class="btn primary" id="btnConfirmarReserva" value="ok">📲 Enviar pedido no WhatsApp</button>
     </div>
-    <p class="muted">Depois de reservar, pague <b id="dlgValor"></b> na chave Pix da página pra garantir seus números.</p>
+    <p class="muted"><span id="dlgTexto">O pedido abre no WhatsApp do organizador. Seus números só ficam PAGOS depois que o vendedor conferir o Pix.</span> Total: <b id="dlgValor"></b></p>
   </form>
 </dialog>
 
@@ -234,7 +231,7 @@ let cfg = {
   whats: '44997096769',
   vendedores: ['Jô','Higor','Victoria e Paulina','Sirley']
 };
-let numeros = {}; // { "23": {nome, whats, status: 'reservado'|'pago'} }
+let numeros = {}; // { "23": {nome, whats, status: 'pago'} }
 let selecionados = new Set();
 let filtro = 'todos';
 // Link/arquivo por vendedor: VENDEDOR_FIXO trava a faixa nas cópias individuais de cada vendedor;
@@ -253,6 +250,11 @@ let filtroFaixa = FAIXA_LINK; // -1 = todas
 let admin = false;
 
 function salvar(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros})); }
+function normalizarPagos(obj){
+  let mudou = false;
+  Object.values(obj || {}).forEach(r=>{ if(r && r.status !== 'pago'){ r.status = 'pago'; mudou = true; } });
+  return mudou;
+}
 function carregar(){
   try{
     const raw = localStorage.getItem(LS_KEY);
@@ -262,7 +264,7 @@ function carregar(){
     if(!Array.isArray(cfg.vendedores) || cfg.vendedores.length!==4) cfg.vendedores = ['Jô','Higor','Victoria e Paulina','Sirley'];
     if(!cfg.organizador) cfg.organizador = 'Fagner';
     if(!cfg.whats) cfg.whats = '44997096769';
-    if(d.numeros) numeros = d.numeros;
+    if(d.numeros){ numeros = d.numeros; if(normalizarPagos(numeros)) salvar(); }
   }catch(e){}
 }
 function fmt(v){ return v.toLocaleString('pt-BR',{style:'currency',currency:'BRL'}); }
@@ -278,12 +280,11 @@ function statusDe(n){ const r = numeros[n]; return r ? r.status : 'livre'; }
 function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function statsFaixa(i){
-  let pagos=0, res=0;
+  let pagos=0;
   for(let n=FAIXAS[i].ini;n<=FAIXAS[i].fim;n++){
-    const st = statusDe(n);
-    if(st==='pago') pagos++; else if(st==='reservado') res++;
+    if(statusDe(n)==='pago') pagos++;
   }
-  return {pagos, res, vendidos: pagos+res, arrecadado: pagos*PRECO, total: qtdFaixa(i)};
+  return {pagos, vendidos: pagos, arrecadado: pagos*PRECO, total: qtdFaixa(i)};
 }
 
 function render(){
@@ -308,27 +309,27 @@ function render(){
   if(btnW) btnW.style.display = (cfg.whats && cfg.whats.replace(/\D/g,'').length >= 10) ? '' : 'none';
 
   // Stats (no link/arquivo de um vendedor, contam só a faixa dele)
-  let pagos=0, reservados=0, totalRef=TOTAL;
+  let pagos=0, totalRef=TOTAL;
   if(FAIXA_LINK===-1){
-    Object.values(numeros).forEach(r=>{ if(r.status==='pago') pagos++; else if(r.status==='reservado') reservados++; });
+    Object.values(numeros).forEach(r=>{ if(r.status==='pago') pagos++; });
   } else {
-    const stF = statsFaixa(FAIXA_LINK); pagos = stF.pagos; reservados = stF.res; totalRef = stF.total;
+    const stF = statsFaixa(FAIXA_LINK); pagos = stF.pagos; totalRef = stF.total;
   }
-  const vendidos = pagos + reservados;
+  const vendidos = pagos;
   document.getElementById('stTotal').textContent = totalRef;
   document.getElementById('stPagos').textContent = pagos;
-  document.getElementById('stReservados').textContent = reservados;
+  document.getElementById('stDisponiveis').textContent = totalRef - pagos;
   document.getElementById('stArrecadado').textContent = fmt(pagos*PRECO);
   const pct = totalRef ? Math.round(vendidos/totalRef*100) : 0;
   document.getElementById('barra').style.width = pct + '%';
   document.getElementById('barraTxt').textContent = pct + '% vendido — ' + vendidos + ' de ' + totalRef + ' números · potencial ' + (FAIXA_LINK===-1 ? 'total' : 'da faixa') + ': ' + fmt(totalRef*PRECO);
 
   // Controle por vendedor
-  let vh = '<table><tr><th>Faixa</th><th>Vendedor</th><th>Vendidos</th><th>Pagos</th><th>Arrecadado</th></tr>';
+  let vh = '<table><tr><th>Faixa</th><th>Vendedor</th><th>Pagos</th><th>Arrecadado</th></tr>';
   FAIXAS.forEach((f,i)=>{
     if(FAIXA_LINK!==-1 && i!==FAIXA_LINK) return;
     const st = statsFaixa(i);
-    vh += '<tr><td>'+rotuloFaixa(i)+'</td><td><b>'+esc(cfg.vendedores[i])+'</b></td><td>'+st.vendidos+'/'+st.total+'</td><td>'+st.pagos+'</td><td>'+fmt(st.arrecadado)+'</td></tr>';
+    vh += '<tr><td>'+rotuloFaixa(i)+'</td><td><b>'+esc(cfg.vendedores[i])+'</b></td><td>'+st.pagos+'/'+st.total+'</td><td>'+fmt(st.arrecadado)+'</td></tr>';
   });
   document.getElementById('vendedoresWrap').innerHTML = vh + '</table>';
 
@@ -354,7 +355,7 @@ function render(){
     const sec = document.createElement('div');
     const divHead = document.createElement('div');
     divHead.className = 'faixa-head'; divHead.style.marginTop = '14px';
-    divHead.innerHTML = '<span><b>📒 Números '+rotuloFaixa(i)+' — '+esc(cfg.vendedores[i])+'</b></span><span class="quem">'+st.vendidos+'/'+st.total+' vendidos · '+fmt(st.arrecadado)+' pagos</span>';
+    divHead.innerHTML = '<span><b>📒 Números '+rotuloFaixa(i)+' — '+esc(cfg.vendedores[i])+'</b></span><span class="quem">'+st.pagos+'/'+st.total+' pagos · '+fmt(st.arrecadado)+' arrecadados</span>';
     sec.appendChild(divHead);
     const grid = document.createElement('div');
     grid.className = 'grid'; grid.style.marginTop = '8px';
@@ -374,7 +375,7 @@ function render(){
         b.onclick = ()=> acaoAdmin(n);
       } else {
         b.disabled = true;
-        b.title = stt==='pago' ? 'Pago por ' + numeros[n].nome : 'Reservado por ' + numeros[n].nome;
+        b.title = 'Pago por ' + numeros[n].nome;
       }
       grid.appendChild(b);
     }
@@ -385,6 +386,8 @@ function render(){
 
   // Barra de seleção
   const sb = document.getElementById('selbar');
+  const btnSel = document.getElementById('btnReservar');
+  if(btnSel) btnSel.textContent = admin ? 'Marcar como pago ➜' : 'Enviar pedido ➜';
   if(selecionados.size){
     sb.classList.add('show');
     const lista = [...selecionados].sort((a,b)=>a-b);
@@ -396,17 +399,16 @@ function render(){
   const wrap = document.getElementById('listaWrap');
   const entries = Object.entries(numeros).filter(([n])=> FAIXA_LINK===-1 || faixaDe(+n)===FAIXA_LINK).sort((a,b)=> (+a[0])-(+b[0]));
   if(!entries.length){
-    wrap.innerHTML = '<p class="empty">Nenhum número reservado ainda. Seja o primeiro! 🍀</p>';
+    wrap.innerHTML = '<p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p>';
   } else {
     let html = '<table><tr><th>Nº</th><th>Nome</th><th>Vendedor</th><th>Status</th>' + (admin?'<th>Ações</th>':'') + '</tr>';
     entries.forEach(([n,r])=>{
       const fi = faixaDe(+n);
       html += '<tr><td><b>'+n+'</b></td><td>'+esc(r.nome)+
         (r.whats ? '<br><a class="wpp" target="_blank" href="https://wa.me/55'+r.whats.replace(/\D/g,'')+'">'+esc(r.whats)+'</a>' : '')+
-        '</td><td>'+esc(cfg.vendedores[fi])+'<br><span class="muted" style="font-size:12px">'+rotuloFaixa(fi)+'</span></td><td><span class="tag '+r.status+'">'+(r.status==='pago'?'PAGO':'RESERVADO')+'</span></td>';
+        '</td><td>'+esc(cfg.vendedores[fi])+'<br><span class="muted" style="font-size:12px">'+rotuloFaixa(fi)+'</span></td><td><span class="tag pago">PAGO</span></td>';
       if(admin){
         html += '<td style="white-space:nowrap">' +
-          (r.status==='reservado' ? '<button class="mini" onclick="marcarPago('+n+')">✔ Pago</button> ' : '') +
           '<button class="mini" onclick="liberar('+n+')">Liberar</button></td>';
       }
       html += '</tr>';
@@ -416,11 +418,7 @@ function render(){
 }
 
 function acaoAdmin(n){
-  const r = numeros[n]; if(!r) return;
-  if(r.status==='reservado' && confirm('Número '+n+' — '+r.nome+'\n\nMarcar como PAGO? (OK = pago · Cancelar = só fechar)')) marcarPago(n);
-}
-function marcarPago(n){
-  if(numeros[n]){ numeros[n].status='pago'; salvar(); render(); toast('Número '+n+' marcado como PAGO ✔'); }
+  liberar(n);
 }
 function liberar(n){
   const r = numeros[n]; if(!r) return;
@@ -428,7 +426,7 @@ function liberar(n){
     delete numeros[n]; selecionados.delete(n); salvar(); render(); toast('Número '+n+' liberado');
   }
 }
-window.marcarPago = marcarPago; window.liberar = liberar;
+window.liberar = liberar;
 
 document.getElementById('filtros').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
@@ -440,6 +438,13 @@ document.getElementById('filtros').addEventListener('click', e=>{
 const dlg = document.getElementById('dlgReserva');
 document.getElementById('btnReservar').onclick = ()=>{
   const lista = [...selecionados].sort((a,b)=>a-b);
+  document.getElementById('dlgTitulo').textContent = admin ? 'Registrar como PAGO' : 'Enviar pedido';
+  document.getElementById('lblNome').textContent = admin ? 'Nome do comprador' : 'Seu nome';
+  document.getElementById('lblWhats').textContent = admin ? 'WhatsApp do comprador' : 'Seu WhatsApp';
+  document.getElementById('btnConfirmarReserva').textContent = admin ? '✔ Confirmar pagamento recebido' : '📲 Enviar pedido no WhatsApp';
+  document.getElementById('dlgTexto').textContent = admin
+    ? 'Use somente depois de conferir o Pix no banco. Ao confirmar, os números são marcados como PAGOS com os dados do comprador.'
+    : 'O pedido abre no WhatsApp do organizador. Seus números só ficam PAGOS depois que o vendedor conferir o Pix.';
   document.getElementById('dlgNums').textContent = 'Número(s): ' + lista.join(', ');
   document.getElementById('dlgValor').textContent = fmt(lista.length*PRECO);
   dlg.showModal();
@@ -450,18 +455,36 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   const nome = document.getElementById('inpNome').value.trim();
   const whats = document.getElementById('inpWhats').value.trim();
   if(!nome || !whats){ toast('Preenche nome e WhatsApp 😉'); return; }
-  [...selecionados].forEach(n=>{ numeros[n] = {nome, whats, status:'reservado'}; });
-  const qtd = selecionados.size;
-  selecionados.clear(); salvar(); render(); dlg.close();
+  const lista = [...selecionados].sort((a,b)=>a-b);
+  const qtd = lista.length;
+  if(admin){
+    lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pago'}; });
+    selecionados.clear(); salvar(); render(); dlg.close();
+    document.getElementById('formReserva').reset();
+    toast('🎉 ' + qtd + ' número(s) marcado(s) como PAGO! Boa sorte! 🍀');
+    return;
+  }
+  const d = (cfg.whats || '').replace(/\D/g,'');
+  if(!d){ toast('WhatsApp do organizador não cadastrado'); return; }
+  const faixaTxt = FAIXA_LINK>=0 ? ('Faixa ' + rotuloFaixa(FAIXA_LINK) + ' — ' + cfg.vendedores[FAIXA_LINK] + '\n') : '';
+  const msg = 'Oi, ' + (cfg.organizador || 'organizador') + '! Quero comprar número(s) da ' + (cfg.titulo || 'Rifa — Kit Churrasco') + ' 🍖\n' +
+    faixaTxt +
+    '🎟️ Número(s): ' + lista.join(', ') + '\n' +
+    '💰 Total: ' + fmt(qtd*PRECO) + '\n' +
+    '🙋 Nome: ' + nome + '\n' +
+    '📱 Meu WhatsApp: ' + whats + '\n' +
+    'Vou fazer o Pix e enviar o comprovante. Pode marcar como PAGO quando conferir, por favor?';
+  selecionados.clear(); render(); dlg.close();
   document.getElementById('formReserva').reset();
-  toast('🎉 ' + qtd + ' número(s) reservado(s)! Agora é só pagar no Pix.');
+  window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
+  toast('Abrindo o WhatsApp com seu pedido 📲');
 });
 
 document.getElementById('modoAdmin').addEventListener('change', e=>{
   admin = e.target.checked;
   document.getElementById('adminHint').innerHTML = admin
-    ? 'Modo organizador <b>ligado</b>: toque num número reservado/pago pra gerenciar, ou use os botões na lista.'
-    : 'Ative o <b>Modo organizador</b> pra marcar como pago, liberar número ou excluir uma reserva.';
+    ? 'Modo organizador <b>ligado</b>: selecione os números comprados pra registrar como PAGO, ou toque num número pago pra liberá-lo.'
+    : '<b>Modo organizador (só do vendedor):</b> depois de conferir o Pix, selecione os números do comprador e use “Marcar como pago”. Também serve pra liberar um número vendido.';
   render();
 });
 
@@ -477,16 +500,16 @@ document.getElementById('btnWhatsOrg').onclick = ()=>{
   window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
 };
 document.getElementById('btnCompartilhar').onclick = ()=>{
-  let pagos=0,res=0,totalShare=TOTAL;
-  if(FAIXA_LINK===-1){ Object.values(numeros).forEach(r=> r.status==='pago'?pagos++:res++); }
-  else { const stS = statsFaixa(FAIXA_LINK); pagos = stS.pagos; res = stS.res; totalShare = stS.total; }
+  let pagos=0,totalShare=TOTAL;
+  if(FAIXA_LINK===-1){ Object.values(numeros).forEach(r=>{ if(r.status==='pago') pagos++; }); }
+  else { const stS = statsFaixa(FAIXA_LINK); pagos = stS.pagos; totalShare = stS.total; }
   const itens = (cfg.kit||'').split('\n').map(x=>x.trim()).filter(Boolean).map(x=>'✔️ '+x).join('\n');
   const txt = '🍖🔥 *' + (cfg.titulo||'Rifa — Kit Churrasco') + '*\n' +
     '🎟️ Só *R$ 5,00* por número!\n' +
     (FAIXA_LINK===-1 ? '' : '📒 Números ' + rotuloFaixa(FAIXA_LINK) + ' — com ' + cfg.vendedores[FAIXA_LINK] + '\n') +
     (itens ? '🎁 *Itens da cesta:*\n' + itens + '\n' : '') +
     '🎥 Sorteio *ao vivo*' + (cfg.data ? ' — ' + cfg.data : '') + (cfg.onde ? ' (' + cfg.onde + ')' : '') + '\n' +
-    '✅ Já foram ' + (pagos+res) + ' de ' + totalShare + ' números — garanta o seu antes que acabe!\n' +
+    '✅ Já foram ' + pagos + ' de ' + totalShare + ' números — garanta o seu antes que acabe!\n' +
     (cfg.pix ? '💸 Pix: ' + cfg.pix : '');
   window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 };
@@ -530,7 +553,7 @@ document.getElementById('fileImport').addEventListener('change', e=>{
       const d = JSON.parse(rd.result);
       if(d.cfg) cfg = Object.assign(cfg, d.cfg);
       if(!Array.isArray(cfg.vendedores) || cfg.vendedores.length!==4) cfg.vendedores = ['Jô','Higor','Victoria e Paulina','Sirley'];
-      numeros = d.numeros || {};
+      numeros = d.numeros || {}; normalizarPagos(numeros);
       selecionados.clear(); salvar(); preencherCfg(); render(); toast('Cópia restaurada! ✔');
     }catch(err){ toast('Arquivo inválido 😕'); }
   };
