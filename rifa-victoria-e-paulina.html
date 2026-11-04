@@ -157,23 +157,6 @@
     <div id="listaWrap"><p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p></div>
   </section>
 
-  <section class="card">
-    <h2>🎲 Sorteador — dia do sorteio</h2>
-    <p class="muted">O sorteio é feito <b>somente entre os números PAGOS</b> (quem pagou de verdade). Toque em SORTEAR e o número gira na tela até sair o ganhador. 🏆</p>
-    <div class="sorteio-palco">
-      <div class="sorteio-num" id="sorteioNum">?</div>
-      <div class="sorteio-nome" id="sorteioNome">Pronto pra sortear 🍀</div>
-      <p class="muted" id="sorteioInfo" style="margin:6px 0 0">0 número(s) pago(s) participando</p>
-    </div>
-    <div class="row">
-      <button class="btn primary" id="btnSortear" style="font-size:17px; padding:13px">🎲 SORTEAR AGORA</button>
-    </div>
-    <div class="row">
-      <button class="btn ghost" id="btnAnunciar" style="display:none">📲 Anunciar ganhador no WhatsApp</button>
-      <button class="btn ghost" id="btnLimparSorteio" style="display:none">🗑️ Limpar resultado</button>
-    </div>
-    <div id="sorteioHistorico"></div>
-  </section>
 
   <section class="card">
     <h2>⚙️ Configurações da rifa</h2>
@@ -204,9 +187,10 @@
     </div>
     <div class="row">
       <button class="btn ghost" id="btnExportar">⬇️ Baixar cópia (backup)</button>
-      <button class="btn ghost" id="btnImportar">⬆️ Restaurar cópia</button>
+      <button class="btn ghost" id="btnImportar">⬆️ Restaurar / juntar cópia</button>
       <input type="file" id="fileImport" accept=".json" style="display:none">
     </div>
+    <p class="muted">📥 <b>Juntar as vendas:</b> cada vendedor toca em <b>Baixar cópia</b> no aparelho dele e manda o arquivo pra Jô. No link <b>GERAL</b>, a Jô toca em <b>Restaurar / juntar cópia</b> e escolhe o arquivo — as vendas daquele vendedor entram na tabela dela <b>sem apagar</b> as que já estão lá.</p>
   </section>
 
   <p class="muted" style="text-align:center">Boa sorte! 🍀🍖 Sorteio ao vivo — todo mundo acompanhando.</p>
@@ -238,6 +222,8 @@
 <script>
 const LS_KEY = 'rifaKitChurrasco_victoria_paulina_v1';
 const PRECO = 5;
+// Endereço da nuvem (Firebase). Vazio = sem sincronização (dados só neste aparelho).
+const NUVEM_URL = 'https://rifa-kit-churrasco-default-rtdb.firebaseio.com';
 const TOTAL = 200;
 // Faixas definidas: cada faixa é de um vendedor (ou dupla)
 const FAIXAS = [
@@ -286,7 +272,74 @@ let filtroFaixa = FAIXA_LINK; // -1 = todas
 let admin = false;
 let sorteio = {historico: []};
 
-function salvar(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros, sorteio})); }
+function salvarLocal(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros, sorteio})); }
+function salvar(){ salvarLocal(); nuvemPush(); }
+// ===== SINCRONIZAÇÃO COM A NUVEM (automática entre celulares) =====
+let nuvemUltimo = {};   // último estado conhecido da nuvem, por número
+let nuvemSorteio = '';  // último histórico de sorteio conhecido da nuvem
+function nuvemAtiva(){ return !!NUVEM_URL; }
+function nuvemPush(){
+  if(!nuvemAtiva()) return;
+  const atuais = {};
+  Object.entries(numeros).forEach(([n,r])=>{ atuais[n] = JSON.stringify(r); });
+  Object.keys(atuais).forEach(n=>{
+    if(nuvemUltimo[n] !== atuais[n]){
+      const corpo = atuais[n];
+      nuvemUltimo[n] = corpo;
+      fetch(NUVEM_URL + '/vendas/' + n + '.json', {method:'PUT', body: corpo})
+        .catch(()=>{ if(nuvemUltimo[n]===corpo) delete nuvemUltimo[n]; });
+    }
+  });
+  Object.keys(nuvemUltimo).forEach(n=>{
+    if(!(n in atuais)){
+      delete nuvemUltimo[n];
+      fetch(NUVEM_URL + '/vendas/' + n + '.json', {method:'DELETE'}).catch(()=>{});
+    }
+  });
+  if(FAIXA_LINK===-1){
+    const s = JSON.stringify(sorteio);
+    if(s !== nuvemSorteio){
+      nuvemSorteio = s;
+      fetch(NUVEM_URL + '/sorteio.json', {method:'PUT', body: s}).catch(()=>{ nuvemSorteio = ''; });
+    }
+  }
+}
+async function nuvemPull(){
+  if(!nuvemAtiva() || sorteando) return;
+  try{
+    const r = await fetch(NUVEM_URL + '/vendas.json');
+    if(!r.ok) return;
+    const dados = (await r.json()) || {};
+    let mudou = false;
+    const vistos = {};
+    Object.entries(dados).forEach(([n,reg])=>{
+      if(!reg || typeof reg !== 'object') return;
+      vistos[n] = JSON.stringify(reg);
+      if(JSON.stringify(numeros[n] || null) !== vistos[n]){ numeros[n] = reg; mudou = true; }
+    });
+    Object.keys(nuvemUltimo).forEach(n=>{
+      if(!(n in vistos) && numeros[n]){ delete numeros[n]; mudou = true; }
+    });
+    nuvemUltimo = vistos;
+    if(FAIXA_LINK===-1){
+      try{
+        const rs = await fetch(NUVEM_URL + '/sorteio.json');
+        if(rs.ok){
+          const ds = await rs.json();
+          if(ds && Array.isArray(ds.historico)){
+            const chaveH = h => h.n + '|' + h.quando;
+            const vistosH = new Set((sorteio.historico || []).map(chaveH));
+            ds.historico.forEach(h=>{ if(!vistosH.has(chaveH(h))){ sorteio.historico.push(h); mudou = true; } });
+            nuvemSorteio = JSON.stringify(sorteio);
+          }
+        }
+      }catch(e){}
+    }
+    nuvemPush();
+    if(mudou){ salvarLocal(); render(); }
+  }catch(e){}
+}
+
 function normalizarPagos(obj){
   let mudou = false;
   Object.values(obj || {}).forEach(r=>{ if(r && r.status === 'reservado'){ r.status = 'pago'; mudou = true; } });
@@ -613,7 +666,7 @@ document.getElementById('btnSalvarCfg').onclick = ()=>{
 document.getElementById('btnExportar').onclick = ()=>{
   const blob = new Blob([JSON.stringify({cfg, numeros, sorteio}, null, 2)], {type:'application/json'});
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob); a.download = 'rifa-kit-churrasco-backup.json'; a.click();
+  a.href = URL.createObjectURL(blob); a.download = 'backup-rifa-' + (FAIXA_LINK===-1 ? 'geral' : (cfg.vendedores[FAIXA_LINK] || 'vendedor').toLowerCase().replace(/[^a-z0-9]+/g,'-')) + '.json'; a.click();
   URL.revokeObjectURL(a.href);
 };
 document.getElementById('btnImportar').onclick = ()=> document.getElementById('fileImport').click();
@@ -623,11 +676,15 @@ document.getElementById('fileImport').addEventListener('change', e=>{
   rd.onload = ()=>{
     try{
       const d = JSON.parse(rd.result);
-      if(d.cfg) cfg = Object.assign(cfg, d.cfg);
-      if(!Array.isArray(cfg.vendedores) || cfg.vendedores.length!==4) cfg.vendedores = ['Jô','Higor','Victoria e Paulina','Sirley'];
-      numeros = d.numeros || {}; normalizarPagos(numeros);
-      if(d.sorteio && Array.isArray(d.sorteio.historico)) sorteio = d.sorteio;
-      selecionados.clear(); salvar(); preencherCfg(); render(); toast('Cópia restaurada! ✔');
+      const imp = d.numeros || {}; normalizarPagos(imp);
+      let qtdImp = 0;
+      Object.entries(imp).forEach(([n,r])=>{ if(r){ numeros[n] = r; qtdImp++; } });
+      if(d.sorteio && Array.isArray(d.sorteio.historico)){
+        const chaveH = h => h.n + '|' + h.quando;
+        const vistosH = new Set((sorteio.historico || []).map(chaveH));
+        d.sorteio.historico.forEach(h=>{ if(!vistosH.has(chaveH(h))) sorteio.historico.push(h); });
+      }
+      selecionados.clear(); salvar(); render(); toast('Cópia juntada: ' + qtdImp + ' número(s) atualizados ✔');
     }catch(err){ toast('Arquivo inválido 😕'); }
   };
   rd.readAsText(f);
@@ -714,8 +771,8 @@ function sortear(){
   }
   passo();
 }
-document.getElementById('btnSortear').onclick = sortear;
-document.getElementById('btnAnunciar').onclick = ()=>{
+const _bS = document.getElementById('btnSortear'); if(_bS) _bS.onclick = sortear;
+const _bA = document.getElementById('btnAnunciar'); if(_bA) _bA.onclick = ()=>{
   const u = (sorteio.historico || [])[0]; if(!u) return;
   const txt = '🎉🏆 *TEMOS UM GANHADOR!* 🏆🎉\n\n' +
     '🍖 *' + (cfg.titulo || 'Rifa — Kit Churrasco') + '*\n' +
@@ -725,7 +782,7 @@ document.getElementById('btnAnunciar').onclick = ()=>{
     'Parabéns! 🎊 Obrigado a todos que participaram! 🍀';
   window.open('https://wa.me/?text=' + encodeURIComponent(txt), '_blank');
 };
-document.getElementById('btnLimparSorteio').onclick = ()=>{
+const _bL = document.getElementById('btnLimparSorteio'); if(_bL) _bL.onclick = ()=>{
   if(confirm('Limpar o resultado do sorteio? Use só se for sortear de novo do zero.')){
     sorteio = {historico: []}; salvar(); renderSorteio(); toast('Resultado do sorteio limpo');
   }
@@ -734,6 +791,7 @@ document.getElementById('btnLimparSorteio').onclick = ()=>{
 carregar();
 preencherCfg();
 render();
+if(nuvemAtiva()){ nuvemPull(); setInterval(nuvemPull, 12000); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) nuvemPull(); }); }
 </script>
 </body>
 </html>
