@@ -273,10 +273,11 @@ let admin = false;
 let sorteio = {historico: []};
 
 function salvarLocal(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros, sorteio})); }
-function salvar(){ salvarLocal(); nuvemPush(); }
+function salvar(){ Object.values(numeros).forEach(r=>{ if(r && r.quando && r.quando > terLocal) terLocal = r.quando; }); salvarLocal(); nuvemPush(); }
 // ===== SINCRONIZAÇÃO COM A NUVEM (automática entre celulares) =====
 let nuvemUltimo = {};   // último estado conhecido da nuvem, por número
 let nuvemSorteio = '';  // último histórico de sorteio conhecido da nuvem
+let terLocal = 0;       // relógio local: registros com 'quando' até aqui já foram vistos/resolvidos
 function nuvemAtiva(){ return !!NUVEM_URL; }
 function nuvemPush(){
   if(!nuvemAtiva()) return;
@@ -293,7 +294,9 @@ function nuvemPush(){
   Object.keys(nuvemUltimo).forEach(n=>{
     if(!(n in atuais)){
       delete nuvemUltimo[n];
+      const tdel = Date.now(); if(tdel > terLocal) terLocal = tdel;
       fetch(NUVEM_URL + '/vendas/' + n + '.json', {method:'DELETE'}).catch(()=>{});
+      fetch(NUVEM_URL + '/apagados/' + n + '.json', {method:'PUT', body: JSON.stringify(tdel)}).catch(()=>{});
     }
   });
   if(FAIXA_LINK===-1){
@@ -320,6 +323,16 @@ async function nuvemPull(){
     Object.keys(nuvemUltimo).forEach(n=>{
       if(!(n in vistos) && numeros[n]){ delete numeros[n]; mudou = true; }
     });
+    try{
+      const ra = await fetch(NUVEM_URL + '/apagados.json');
+      if(ra.ok){
+        const apag = (await ra.json()) || {};
+        Object.entries(apag).forEach(([n,tdel])=>{
+          const rec = numeros[n];
+          if(rec && !(n in vistos) && (rec.quando || 0) <= tdel){ delete numeros[n]; mudou = true; }
+        });
+      }
+    }catch(e){}
     nuvemUltimo = vistos;
     if(FAIXA_LINK===-1){
       try{
@@ -576,7 +589,7 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   const lista = [...selecionados].sort((a,b)=>a-b);
   const qtd = lista.length;
   if(admin){
-    lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pago'}; });
+    lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pago', quando: Date.now()}; });
     selecionados.clear(); salvar(); render(); dlg.close();
     document.getElementById('formReserva').reset();
     toast('🎉 ' + qtd + ' número(s) marcado(s) como PAGO! Boa sorte! 🍀');
@@ -791,7 +804,7 @@ const _bL = document.getElementById('btnLimparSorteio'); if(_bL) _bL.onclick = (
 carregar();
 preencherCfg();
 render();
-if(nuvemAtiva()){ nuvemPull(); setInterval(nuvemPull, 12000); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) nuvemPull(); }); }
+if(nuvemAtiva()){ nuvemPull(); setInterval(nuvemPull, 12000); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ nuvemPush(); nuvemPull(); } }); }
 </script>
 </body>
 </html>
