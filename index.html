@@ -42,6 +42,7 @@
   .num{aspect-ratio:1; border-radius:10px; border:2px solid var(--green); background:#eafaf0; color:#146c39;
        font-weight:800; font-size:15px; cursor:pointer; display:flex; align-items:center; justify-content:center; padding:0}
   .num.pago{background:#fde3e3; border-color:var(--red); color:#a11; cursor:default}
+  .num.pendente{background:#fff3c4; border-color:#e0a800; color:#7a5200; cursor:default}
   .num.sel{background:var(--brand); border-color:var(--brand); color:#fff; transform:scale(1.06)}
   .num:disabled{cursor:default}
   .selbar{position:sticky; bottom:10px; margin-top:14px; background:var(--ink); color:#fff; border-radius:14px; padding:12px 14px; display:none; align-items:center; justify-content:space-between; gap:10px; box-shadow:0 8px 20px rgba(0,0,0,.25); z-index:5}
@@ -51,6 +52,7 @@
   th{color:var(--muted); font-size:12px; text-transform:uppercase}
   .tag{font-size:11px; font-weight:800; padding:2px 8px; border-radius:999px; white-space:nowrap}
   .tag.pago{background:#fde3e3; color:#a11}
+  .tag.pendente{background:#fff3c4; color:#7a5200}
   .mini{font-size:12px; padding:5px 9px; border-radius:8px; border:1px solid var(--line); background:#fff; cursor:pointer; font-weight:700}
   dialog{border:none; border-radius:18px; padding:0; width:min(94vw,430px); box-shadow:0 20px 50px rgba(0,0,0,.3)}
   dialog::backdrop{background:rgba(20,10,5,.5)}
@@ -117,19 +119,21 @@
     <div class="legend">
       <span><i class="dot" style="background:#eafaf0;border:2px solid var(--green)"></i>Disponível</span>
       <span><i class="dot" style="background:#fde3e3;border:2px solid var(--red)"></i>Pago</span>
+      <span><i class="dot" style="background:#fff3c4;border:2px solid #e0a800"></i>Pendente</span>
     </div>
     <div class="filters" id="filtrosFaixa"></div>
     <div class="filters" id="filtros">
       <button data-f="todos" class="on">Todos</button>
       <button data-f="livre">Disponíveis</button>
       <button data-f="pago">Pagos</button>
+      <button data-f="pendente">Pendentes</button>
     </div>
     <div id="faixas"></div>
     <div class="selbar" id="selbar">
       <div><b id="selTxt">0 número(s)</b><div style="font-size:13px; opacity:.85" id="selTotal">Total: R$ 0,00</div></div>
       <button class="btn primary" id="btnReservar">💸 Pagar com Pix ➜</button>
     </div>
-    <p class="muted">Toque nos números verdes pra escolher e depois em PAGAR COM PIX: a chave aparece pra copiar, você paga no seu banco e envia o comprovante. Quem confirma e marca PAGO é o vendedor. 👇</p>
+    <p class="muted">Toque nos números verdes pra escolher e depois em PAGAR COM PIX: a chave aparece pra copiar, você paga no seu banco e envia o comprovante. Seu número fica PENDENTE (amarelo) até o vendedor conferir e marcar PAGO. 👇</p>
   </section>
 
   <section class="card">
@@ -149,6 +153,7 @@
       <label class="switch"><input type="checkbox" id="modoAdmin"> Modo organizador</label>
     </div>
     <p class="muted" id="adminHint"><b>Modo organizador (só do vendedor):</b> depois de conferir o Pix, selecione os números do comprador e use “Marcar como pago”. Também serve pra liberar um número vendido.</p>
+    <div class="row" style="margin-bottom:8px"><button class="btn ghost" id="btnPendentes" style="display:none">⏳ Pendentes (0)</button></div>
     <div id="listaWrap"><p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p></div>
   </section>
 
@@ -264,6 +269,7 @@ let cfg = {
 let numeros = {}; // { "23": {nome, whats, status: 'pago'} }
 let selecionados = new Set();
 let filtro = 'todos';
+let soPendentes = false;
 // Link/arquivo por vendedor: VENDEDOR_FIXO trava a faixa nas cópias individuais de cada vendedor;
 // no arquivo geral, o parâmetro ?v=jo|higor|victoria|sirley no link faz o mesmo.
 const VENDEDOR_FIXO = -1;
@@ -283,7 +289,7 @@ let sorteio = {historico: []};
 function salvar(){ localStorage.setItem(LS_KEY, JSON.stringify({cfg, numeros, sorteio})); }
 function normalizarPagos(obj){
   let mudou = false;
-  Object.values(obj || {}).forEach(r=>{ if(r && r.status !== 'pago'){ r.status = 'pago'; mudou = true; } });
+  Object.values(obj || {}).forEach(r=>{ if(r && r.status === 'reservado'){ r.status = 'pago'; mudou = true; } });
   return mudou;
 }
 function carregar(){
@@ -312,11 +318,12 @@ function statusDe(n){ const r = numeros[n]; return r ? r.status : 'livre'; }
 function esc(s){ return String(s||'').replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
 function statsFaixa(i){
-  let pagos=0;
+  let pagos=0, pendentes=0;
   for(let n=FAIXAS[i].ini;n<=FAIXAS[i].fim;n++){
     if(statusDe(n)==='pago') pagos++;
+    if(statusDe(n)==='pendente') pendentes++;
   }
-  return {pagos, vendidos: pagos, arrecadado: pagos*PRECO, total: qtdFaixa(i)};
+  return {pagos, pendentes, vendidos: pagos, arrecadado: pagos*PRECO, total: qtdFaixa(i)};
 }
 
 function render(){
@@ -339,29 +346,36 @@ function render(){
   document.getElementById('pixChave').textContent = cfg.pix ? '🔑 ' + cfg.pix : '⚠️ Chave Pix ainda não cadastrada — o organizador adiciona nas Configurações';
   const btnW = document.getElementById('btnWhatsOrg');
   if(btnW) btnW.style.display = (cfg.whats && cfg.whats.replace(/\D/g,'').length >= 10) ? '' : 'none';
+  const btnP = document.getElementById('btnPendentes');
+  if(btnP){
+    let qtdP = 0;
+    Object.entries(numeros).forEach(([n,r])=>{ if(r.status==='pendente' && (FAIXA_LINK===-1 || faixaDe(+n)===FAIXA_LINK)) qtdP++; });
+    btnP.textContent = soPendentes ? '✖ Mostrar todos' : '⏳ Pendentes (' + qtdP + ')';
+    btnP.style.display = admin ? '' : 'none';
+  }
 
   // Stats (no link/arquivo de um vendedor, contam só a faixa dele)
-  let pagos=0, totalRef=TOTAL;
+  let pagos=0, pendentes=0, totalRef=TOTAL;
   if(FAIXA_LINK===-1){
-    Object.values(numeros).forEach(r=>{ if(r.status==='pago') pagos++; });
+    Object.values(numeros).forEach(r=>{ if(r.status==='pago') pagos++; if(r.status==='pendente') pendentes++; });
   } else {
-    const stF = statsFaixa(FAIXA_LINK); pagos = stF.pagos; totalRef = stF.total;
+    const stF = statsFaixa(FAIXA_LINK); pagos = stF.pagos; pendentes = stF.pendentes; totalRef = stF.total;
   }
   const vendidos = pagos;
   document.getElementById('stTotal').textContent = totalRef;
   document.getElementById('stPagos').textContent = pagos;
-  document.getElementById('stDisponiveis').textContent = totalRef - pagos;
+  document.getElementById('stDisponiveis').textContent = totalRef - pagos - pendentes;
   document.getElementById('stArrecadado').textContent = fmt(pagos*PRECO);
   const pct = totalRef ? Math.round(vendidos/totalRef*100) : 0;
   document.getElementById('barra').style.width = pct + '%';
-  document.getElementById('barraTxt').textContent = pct + '% vendido — ' + vendidos + ' de ' + totalRef + ' números · potencial ' + (FAIXA_LINK===-1 ? 'total' : 'da faixa') + ': ' + fmt(totalRef*PRECO);
+  document.getElementById('barraTxt').textContent = pct + '% vendido — ' + vendidos + ' de ' + totalRef + ' números · potencial ' + (FAIXA_LINK===-1 ? 'total' : 'da faixa') + ': ' + fmt(totalRef*PRECO) + (pendentes ? ' · ⏳ ' + pendentes + ' pendente(s) aguardando confirmação' : '');
 
   // Controle por vendedor
-  let vh = '<table><tr><th>Faixa</th><th>Vendedor</th><th>Pagos</th><th>Arrecadado</th></tr>';
+  let vh = '<table><tr><th>Faixa</th><th>Vendedor</th><th>Pagos</th><th>Pendentes</th><th>Arrecadado</th></tr>';
   FAIXAS.forEach((f,i)=>{
     if(FAIXA_LINK!==-1 && i!==FAIXA_LINK) return;
     const st = statsFaixa(i);
-    vh += '<tr><td>'+rotuloFaixa(i)+'</td><td><b>'+esc(cfg.vendedores[i])+'</b></td><td>'+st.pagos+'/'+st.total+'</td><td>'+fmt(st.arrecadado)+'</td></tr>';
+    vh += '<tr><td>'+rotuloFaixa(i)+'</td><td><b>'+esc(cfg.vendedores[i])+'</b></td><td>'+st.pagos+'/'+st.total+'</td><td>'+st.pendentes+'</td><td>'+fmt(st.arrecadado)+'</td></tr>';
   });
   document.getElementById('vendedoresWrap').innerHTML = vh + '</table>';
 
@@ -387,7 +401,7 @@ function render(){
     const sec = document.createElement('div');
     const divHead = document.createElement('div');
     divHead.className = 'faixa-head'; divHead.style.marginTop = '14px';
-    divHead.innerHTML = '<span><b>📒 Números '+rotuloFaixa(i)+' — '+esc(cfg.vendedores[i])+'</b></span><span class="quem">'+st.pagos+'/'+st.total+' pagos · '+fmt(st.arrecadado)+' arrecadados</span>';
+    divHead.innerHTML = '<span><b>📒 Números '+rotuloFaixa(i)+' — '+esc(cfg.vendedores[i])+'</b></span><span class="quem">'+st.pagos+'/'+st.total+' pagos' + (st.pendentes ? ' · '+st.pendentes+' pendente(s)' : '') + ' · '+fmt(st.arrecadado)+' arrecadados</span>';
     sec.appendChild(divHead);
     const grid = document.createElement('div');
     grid.className = 'grid'; grid.style.marginTop = '8px';
@@ -407,7 +421,7 @@ function render(){
         b.onclick = ()=> acaoAdmin(n);
       } else {
         b.disabled = true;
-        b.title = 'Pago por ' + numeros[n].nome;
+        b.title = stt==='pendente' ? ('Pendente — ' + numeros[n].nome + ' (aguardando confirmação do Pix)') : ('Pago por ' + numeros[n].nome);
       }
       grid.appendChild(b);
     }
@@ -429,18 +443,19 @@ function render(){
 
   // Lista de compradores
   const wrap = document.getElementById('listaWrap');
-  const entries = Object.entries(numeros).filter(([n])=> FAIXA_LINK===-1 || faixaDe(+n)===FAIXA_LINK).sort((a,b)=> (+a[0])-(+b[0]));
+  const entries = Object.entries(numeros).filter(([n])=> FAIXA_LINK===-1 || faixaDe(+n)===FAIXA_LINK).filter(([,r])=> !soPendentes || r.status==='pendente').sort((a,b)=> (+a[0])-(+b[0]));
   if(!entries.length){
-    wrap.innerHTML = '<p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p>';
+    wrap.innerHTML = soPendentes ? '<p class="empty">Nenhuma pendência por aqui. 🎉</p>' : '<p class="empty">Nenhum número vendido ainda. Seja o primeiro! 🍀</p>';
   } else {
     let html = '<table><tr><th>Nº</th><th>Nome</th><th>Vendedor</th><th>Status</th>' + (admin?'<th>Ações</th>':'') + '</tr>';
     entries.forEach(([n,r])=>{
       const fi = faixaDe(+n);
       html += '<tr><td><b>'+n+'</b></td><td>'+esc(r.nome)+
         (r.whats ? '<br><a class="wpp" target="_blank" href="https://wa.me/55'+r.whats.replace(/\D/g,'')+'">'+esc(r.whats)+'</a>' : '')+
-        '</td><td>'+esc(cfg.vendedores[fi])+'<br><span class="muted" style="font-size:12px">'+rotuloFaixa(fi)+'</span></td><td><span class="tag pago">PAGO</span></td>';
+        '</td><td>'+esc(cfg.vendedores[fi])+'<br><span class="muted" style="font-size:12px">'+rotuloFaixa(fi)+'</span></td><td>' + (r.status==='pendente' ? '<span class="tag pendente">⏳ PENDENTE</span>' : '<span class="tag pago">PAGO</span>') + '</td>';
       if(admin){
         html += '<td style="white-space:nowrap">' +
+          (r.status==='pendente' ? '<button class="mini" onclick="marcarPago('+n+')">✔ Pago</button> ' : '') +
           '<button class="mini" onclick="liberar('+n+')">Liberar</button></td>';
       }
       html += '</tr>';
@@ -451,6 +466,13 @@ function render(){
 }
 
 function acaoAdmin(n){
+  const r = numeros[n]; if(!r) return;
+  if(r.status==='pendente'){
+    if(confirm('Marcar o número '+n+' ('+r.nome+') como PAGO? Só confirme depois de conferir o Pix.')){
+      r.status = 'pago'; salvar(); render(); toast('✔ Número '+n+' marcado como PAGO');
+    }
+    return;
+  }
   liberar(n);
 }
 function liberar(n){
@@ -460,6 +482,11 @@ function liberar(n){
   }
 }
 window.liberar = liberar;
+function marcarPago(n){
+  const r = numeros[n]; if(!r || r.status!=='pendente') return;
+  r.status = 'pago'; salvar(); render(); toast('✔ Número '+n+' marcado como PAGO');
+}
+window.marcarPago = marcarPago;
 
 document.getElementById('filtros').addEventListener('click', e=>{
   const b = e.target.closest('button'); if(!b) return;
@@ -477,7 +504,7 @@ document.getElementById('btnReservar').onclick = ()=>{
   document.getElementById('btnConfirmarReserva').textContent = admin ? '✔ Confirmar pagamento recebido' : '📲 Já paguei — enviar comprovante';
   document.getElementById('dlgTexto').textContent = admin
     ? 'Use somente depois de conferir o Pix no banco. Ao confirmar, os números são marcados como PAGOS com os dados do comprador.'
-    : 'Seus números só ficam PAGOS depois que o vendedor conferir o Pix. Não esquece de anexar a foto do comprovante na conversa do WhatsApp.';
+    : 'Ao enviar, seus números ficam PENDENTES (amarelos) até o vendedor conferir o Pix e marcar como PAGO. Não esquece de anexar a foto do comprovante na conversa do WhatsApp.';
   document.getElementById('dlgNums').textContent = 'Número(s): ' + lista.join(', ');
   const dpb = document.getElementById('dlgPixBox');
   if(dpb) dpb.style.display = admin ? 'none' : '';
@@ -512,20 +539,22 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
     '🙋 Nome: ' + nome + '\n' +
     '📱 Meu WhatsApp: ' + whats + '\n' +
     'Segue o comprovante aqui na conversa. Pode marcar como PAGO quando conferir, por favor?';
-  selecionados.clear(); render(); dlg.close();
+  lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pendente', quando: Date.now()}; });
+  selecionados.clear(); salvar(); render(); dlg.close();
   document.getElementById('formReserva').reset();
   window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
-  toast('Abrindo o WhatsApp — anexe o comprovante 📎');
+  toast('⏳ Número(s) PENDENTE(S) — agora envie o comprovante no WhatsApp 📎');
 });
 
 document.getElementById('modoAdmin').addEventListener('change', e=>{
   admin = e.target.checked;
   document.getElementById('adminHint').innerHTML = admin
-    ? 'Modo organizador <b>ligado</b>: selecione os números comprados pra registrar como PAGO, ou toque num número pago pra liberá-lo.'
+    ? 'Modo organizador <b>ligado</b>: toque num número <b>pendente (amarelo)</b> pra marcar como PAGO depois de conferir o Pix, ou use o botão ⏳ Pendentes. Toque num número pago pra liberá-lo.'
     : '<b>Modo organizador (só do vendedor):</b> depois de conferir o Pix, selecione os números do comprador e use “Marcar como pago”. Também serve pra liberar um número vendido.';
   render();
 });
 
+document.getElementById('btnPendentes').onclick = ()=>{ soPendentes = !soPendentes; render(); };
 document.getElementById('btnCopiarPix').onclick = async ()=>{
   if(!cfg.pix){ toast('Cadastra a chave Pix nas Configurações primeiro'); return; }
   try{ await navigator.clipboard.writeText(cfg.pix); toast('Chave Pix copiada! 📋'); }
