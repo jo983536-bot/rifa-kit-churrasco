@@ -728,7 +728,7 @@ function renderSorteio(){
   if(sorteio.historico && sorteio.historico.length){
     if(btnA) btnA.style.display = '';
     if(btnL) btnL.style.display = '';
-    hist.innerHTML = '<h3>🏆 Resultado(s) do sorteio</h3>' + sorteio.historico.map(h =>
+    if(hist) hist.innerHTML = '<h3>🏆 Resultado(s) do sorteio</h3>' + sorteio.historico.map(h =>
       '<p style="margin:6px 0"><b>Nº ' + h.n + '</b> — ' + esc(h.nome) +
       ' <span class="muted">(vendido por ' + esc(h.vendedor) + ' · ' + esc(h.quando) + ')</span></p>').join('');
     if(!sorteando && numEl && nomeEl){
@@ -739,7 +739,7 @@ function renderSorteio(){
   } else {
     if(btnA) btnA.style.display = 'none';
     if(btnL) btnL.style.display = 'none';
-    hist.innerHTML = '';
+    if(hist) hist.innerHTML = '';
     if(!sorteando && numEl && nomeEl){
       numEl.textContent = '?';
       numEl.classList.remove('ganhou');
