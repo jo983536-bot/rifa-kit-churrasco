@@ -310,7 +310,7 @@ function nuvemPush(){
 async function nuvemPull(){
   if(!nuvemAtiva() || sorteando) return;
   try{
-    const r = await fetch(NUVEM_URL + '/vendas.json');
+    const r = await fetch(NUVEM_URL + '/vendas.json', {cache:'no-store'});
     if(!r.ok) return;
     const dados = (await r.json()) || {};
     let mudou = false;
@@ -590,9 +590,9 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
   const qtd = lista.length;
   if(admin){
     lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pago', quando: Date.now()}; });
-    selecionados.clear(); salvar(); render(); dlg.close();
+    selecionados.clear(); salvarLocal(); render(); dlg.close();
     document.getElementById('formReserva').reset();
-    toast('🎉 ' + qtd + ' número(s) marcado(s) como PAGO! Boa sorte! 🍀');
+    toast('🎉 ' + qtd + ' número(s) marcado(s) como PAGO! Boa sorte! 🍀'); try{ nuvemPush(); }catch(e){}
     return;
   }
   const d = (cfg.whats || '').replace(/\D/g,'');
@@ -606,10 +606,10 @@ document.getElementById('formReserva').addEventListener('submit', e=>{
     (whats ? ('📱 Meu WhatsApp: ' + whats + '\n') : '') +
     'Segue o comprovante aqui na conversa. Pode marcar como PAGO quando conferir, por favor?';
   lista.forEach(n=>{ numeros[n] = {nome, whats, status:'pendente', quando: Date.now()}; });
-  selecionados.clear(); salvar(); render(); dlg.close();
+  selecionados.clear(); salvarLocal(); render(); dlg.close();
   document.getElementById('formReserva').reset();
-  window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank');
   toast('⏳ Número(s) PENDENTE(S) — agora envie o comprovante no WhatsApp 📎');
+  try{ nuvemPush(); window.open('https://wa.me/55' + d + '?text=' + encodeURIComponent(msg), '_blank'); }catch(e){}
 });
 
 document.getElementById('modoAdmin').addEventListener('change', e=>{
@@ -804,7 +804,7 @@ const _bL = document.getElementById('btnLimparSorteio'); if(_bL) _bL.onclick = (
 carregar();
 preencherCfg();
 render();
-if(nuvemAtiva()){ nuvemPull(); setInterval(nuvemPull, 12000); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ nuvemPush(); nuvemPull(); } }); }
+if(nuvemAtiva()){ nuvemPull(); setInterval(nuvemPull, 12000); document.addEventListener('visibilitychange', ()=>{ if(!document.hidden){ nuvemPush(); nuvemPull(); } }); window.addEventListener('online', ()=>{ nuvemPush(); nuvemPull(); }); }
 </script>
 </body>
 </html>
